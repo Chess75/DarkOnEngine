@@ -181,13 +181,14 @@ challenge:                                # Incoming challenges.
     - rated                               # Rated games
 
   matchmaking:
-   delay: 480                              # Time in seconds the bot must be idle before a new challenge is started.
-   timeout: 30                             # Time until a challenge is canceled.
-   selection: weighted_random              # Matchmkaing type selection is one of "weighted_random", "sequential" or "cyclic".
-   types:                                  # Matchmaking types of which one is selected before each game.
-     blitz:                                # Arbitrary name of the matchmaking type. Names must be unique.
-      tc: 3+0                              # Time control in initial_minutes+increment_seconds format.
-      rated: false
+    delay: 480                  # Sekunden Idle-Zeit vor neuer Challenge
+    timeout: 30                 # Abbruchzeit für Challenges
+    selection: weighted_random
+    types:
+      blitz:
+        tc: 3+0
+        rated: false
+
 #   casual_chess960:
 #     tc: 8+1
 #     rated: false
