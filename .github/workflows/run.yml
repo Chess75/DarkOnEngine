@@ -39,7 +39,7 @@ jobs:
       - name: hi
         run: |
 
-          chmod +x engines/Okval.py
+          chmod +x engines/DarkOnEngine.py
 
       - name: Run Bot
         run: |
