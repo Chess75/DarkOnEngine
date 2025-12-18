@@ -1,9 +1,9 @@
-token: "XXXXXXXXXXXXXXXXXXXXXXXX"         # Lichess OAuth2 Token.
+token: ""         # Lichess OAuth2 Token.
 
 engines:
   standard:                               # Engine used for standard chess and when no suitable special engine is configured.
     dir: "./engines"                      # Directory containing the engine.
-    name: "engine_executable"             # Binary name of the engine to use.
+    name: "DarkOnEngine.py"             # Binary name of the engine to use.
     ponder: true                          # Think on opponent's time.
     silence_stderr: false                 # Suppresses stderr output.
     move_overhead_multiplier: 1.0         # Increase if your bot flags games too often. Default move overhead is 1 second per 1 minute initital time.
@@ -144,7 +144,7 @@ resign:
 # min_rating: 2300                        # Minimum rating of opponent to resign.
 
 challenge:                                # Incoming challenges.
-  concurrency: 1                          # Number of games to play simultaneously.
+  concurrency: 10                          # Number of games to play simultaneously.
   max_takebacks: 3                        # Maximum number of takebacks granted to a human.
   bullet_with_increment_only: false       # Whether bullet games against BOTs should only be accepted with increment.
 # min_increment: 0                        # Minimum amount of increment to accept a challenge.
