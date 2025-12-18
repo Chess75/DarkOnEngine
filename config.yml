@@ -180,11 +180,12 @@ challenge:                                # Incoming challenges.
     - casual                              # Unrated games.
     - rated                               # Rated games
 
-  matchmaking:
-    delay: 480                  # Sekunden Idle-Zeit vor neuer Challenge
-    timeout: 30                 # Abbruchzeit für Challenges
-    selection: weighted_random
-    types:
+ config:
+   matchmaking:
+     delay: 480                  # Sekunden Idle-Zeit vor neuer Challenge
+     timeout: 30                 # Abbruchzeit für Challenges
+     selection: weighted_random
+     types:
       blitz:
         tc: 3+0
         rated: false
