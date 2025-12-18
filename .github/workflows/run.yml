@@ -1,3 +1,5 @@
+run.yml:
+
 name: Run Bot
 
 on:
@@ -44,7 +46,7 @@ jobs:
       - name: Run Bot
         run: |
           echo "Starting bot..."
-          python3 -u user_interface.py "matchmaking" &
+          python3 -u user_interface.py "matchmaking" "upgrade" &
           PID=$!
           
           # Auto-exit after 350 minutes (so restart runs without overlap)
