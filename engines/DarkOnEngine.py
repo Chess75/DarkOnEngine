@@ -22,10 +22,9 @@ piece_values = {
 center_squares = [chess.D4, chess.E4, chess.D5, chess.E5]
 
 # =====================
-# Zeit → Denkzeit Mapping
+# Zeit → Denkzeit Mapping (angepasst, langsamer)
 # =====================
-
-    def calculate_think_time(remaining_time_ms):
+def calculate_think_time(remaining_time_ms):
     t = remaining_time_ms / 1000  # Sekunden
 
     if t >= 1800:      # 30 Minuten
