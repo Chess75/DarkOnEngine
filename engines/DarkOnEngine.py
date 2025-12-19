@@ -23,20 +23,40 @@ center_squares = [chess.D4, chess.E4, chess.D5, chess.E5]
 
 
 def evaluate_board(board):
+    # Matt / Patt
     if board.is_checkmate():
         return 10000 if board.turn == chess.BLACK else -10000
     if board.is_stalemate():
         return 0
 
     score = 0
+
+    # Material
     for piece_type in piece_values:
         score += len(board.pieces(piece_type, chess.WHITE)) * piece_values[piece_type]
         score -= len(board.pieces(piece_type, chess.BLACK)) * piece_values[piece_type]
 
+    # Zentrum
     for square in center_squares:
         piece = board.piece_at(square)
         if piece:
             score += 0.2 if piece.color == chess.WHITE else -0.2
+
+    # ============================
+    # Anti-Dame / Anti-König-Gezappel
+    # ============================
+
+    # Dame früh bewegen bestrafen
+    if board.fullmove_number < 10:
+        score -= 0.3 * len(board.pieces(chess.QUEEN, chess.WHITE))
+        score += 0.3 * len(board.pieces(chess.QUEEN, chess.BLACK))
+
+    # König vor Rochade bewegen bestrafen
+    if board.fullmove_number < 15:
+        if not board.has_castled(chess.WHITE):
+            score -= 0.2
+        if not board.has_castled(chess.BLACK):
+            score += 0.2
 
     return score
 
@@ -74,7 +94,7 @@ def minimax(board, depth):
 def choose_move(board):
     global remaining_time_ms
 
-    # Panikmodus
+    # Panikmodus bei Zeitnot → absichtlich schlecht
     if remaining_time_ms < 1000:
         return random.choice(list(board.legal_moves))
 
@@ -82,12 +102,8 @@ def choose_move(board):
     if board.fullmove_number == 1:
         return random.choice(list(board.legal_moves))
 
-    # Dynamische Tiefe
+    # Feste schwache Tiefe
     depth = 2
-    if remaining_time_ms > 60000:
-        depth = 3
-    if remaining_time_ms > 180000:
-        depth = 4
 
     best_score = -float('inf') if board.turn == chess.WHITE else float('inf')
     best_moves = []
@@ -99,6 +115,9 @@ def choose_move(board):
         board.push(move)
         score = minimax(board, depth)
         board.pop()
+
+        # Leichte Zufälligkeit (macht menschlich & schwach)
+        score += random.uniform(-0.15, 0.15)
 
         if board.turn == chess.WHITE:
             if score > best_score:
