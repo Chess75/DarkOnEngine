@@ -2,14 +2,15 @@
 import sys
 import chess
 import random
-import time
+
+SPEED = 5  # 1 - too slow but smart, 10 - too fast but dumb.
 
 piece_values = {
-    chess.PAWN: 100,
-    chess.KNIGHT: 320,
-    chess.BISHOP: 330,
-    chess.ROOK: 500,
-    chess.QUEEN: 900,
+    chess.PAWN: 1,
+    chess.KNIGHT: 3,
+    chess.BISHOP: 3,
+    chess.ROOK: 5,
+    chess.QUEEN: 9,
     chess.KING: 0
 }
 
@@ -18,92 +19,81 @@ center_squares = [chess.D4, chess.E4, chess.D5, chess.E5]
 
 def evaluate_board(board):
     if board.is_checkmate():
-        return -100000 if board.turn else 100000
+        return 10000 if board.turn == chess.BLACK else -10000
     if board.is_stalemate():
         return 0
 
     score = 0
-    for piece in piece_values:
-        score += len(board.pieces(piece, chess.WHITE)) * piece_values[piece]
-        score -= len(board.pieces(piece, chess.BLACK)) * piece_values[piece]
+    for piece_type in piece_values:
+        score += len(board.pieces(piece_type, chess.WHITE)) * piece_values[piece_type]
+        score -= len(board.pieces(piece_type, chess.BLACK)) * piece_values[piece_type]
 
-    for sq in center_squares:
-        p = board.piece_at(sq)
-        if p:
-            score += 20 if p.color == chess.WHITE else -20
+    for square in center_squares:
+        piece = board.piece_at(square)
+        if piece:
+            score += 0.2 if piece.color == chess.WHITE else -0.2
 
     return score
 
 
-# ------------------ ALPHA-BETA ------------------
+# ---------------- MINIMAX ----------------
 
-def ordered_moves(board):
-    moves = list(board.legal_moves)
-    moves.sort(key=lambda m: board.is_capture(m), reverse=True)
-    return moves
-
-
-def alphabeta(board, depth, alpha, beta):
+def minimax(board, depth):
     if depth == 0 or board.is_game_over():
         return evaluate_board(board)
 
     if board.turn == chess.WHITE:
-        value = -float('inf')
-        for move in ordered_moves(board):
+        best = -float('inf')
+        for move in board.legal_moves:
             board.push(move)
-            value = max(value, alphabeta(board, depth - 1, alpha, beta))
+            best = max(best, minimax(board, depth - 1))
             board.pop()
-            alpha = max(alpha, value)
-            if alpha >= beta:
-                break
-        return value
+        return best
     else:
-        value = float('inf')
-        for move in ordered_moves(board):
+        best = float('inf')
+        for move in board.legal_moves:
             board.push(move)
-            value = min(value, alphabeta(board, depth - 1, alpha, beta))
+            best = min(best, minimax(board, depth - 1))
             board.pop()
-            beta = min(beta, value)
-            if beta <= alpha:
-                break
-        return value
-
-def choose_depth(time_left_ms):
-    if time_left_ms < 1000:
-        return 1
-    if time_left_ms < 3000:
-        return 2
-    return 3
+        return best
 
 
-def choose_move(board, time_left_ms):
-    # аварийный режим
-    if time_left_ms is not None and time_left_ms < 800:
+def speed_to_depth():
+    return max(1, 6 - SPEED // 2)
+
+
+def choose_move(board):
+    depth = speed_to_depth()
+
+    # старт — случайный ход
+    if board.fullmove_number == 1:
         return random.choice(list(board.legal_moves))
 
-    depth = choose_depth(time_left_ms if time_left_ms else 10000)
-
-    best_move = None
     best_score = -float('inf') if board.turn == chess.WHITE else float('inf')
+    best_moves = []
 
-    for move in ordered_moves(board):
+    for move in board.legal_moves:
         board.push(move)
-        score = alphabeta(board, depth - 1, -float('inf'), float('inf'))
+        score = minimax(board, depth)
         board.pop()
 
         if board.turn == chess.WHITE:
             if score > best_score:
                 best_score = score
-                best_move = move
+                best_moves = [move]
+            elif score == best_score:
+                best_moves.append(move)
         else:
             if score < best_score:
                 best_score = score
-                best_move = move
+                best_moves = [move]
+            elif score == best_score:
+                best_moves.append(move)
 
-    return best_move
+    return random.choice(best_moves) if best_moves else None
 
 
-# ------------------ UCI ------------------
+# ---------------- UCI ----------------
 
 def main():
     board = chess.Board()
@@ -143,15 +133,7 @@ def main():
                         board.push_uci(mv)
 
         elif line.startswith("go"):
-            parts = line.split()
-            time_left = None
-
-            if board.turn == chess.WHITE and "wtime" in parts:
-                time_left = int(parts[parts.index("wtime") + 1])
-            elif board.turn == chess.BLACK and "btime" in parts:
-                time_left = int(parts[parts.index("btime") + 1])
-
-            move = choose_move(board, time_left)
+            move = choose_move(board)
             print("bestmove", move.uci() if move else "0000")
 
         elif line == "quit":
