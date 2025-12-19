@@ -9,11 +9,11 @@ from collections import defaultdict, namedtuple
 INF = 99999999
 
 PIECE_VALUES = {
-    chess.PAWN: 100,
-    chess.KNIGHT: 320,
-    chess.BISHOP: 330,
-    chess.ROOK: 500,
-    chess.QUEEN: 900,
+    chess.PAWN: 95,
+    chess.KNIGHT: 300,
+    chess.BISHOP: 310,
+    chess.ROOK: 450,
+    chess.QUEEN: 850,
     chess.KING: 20000
 }
 
@@ -51,10 +51,7 @@ def fast_board_key(board: chess.Board):
 
 
 def mvv_lva_score(board, move):
-    """
-    MVV-LVA с учётом en-passant (если применимо) и премией за промоцию.
-    Чем выше — тем раньше ход.
-    """
+
     score = 0
     if board.is_capture(move):
         # определить жертву: для en-passant жертва — пешка не на to_square
@@ -93,7 +90,7 @@ def evaluate(board: chess.Board):
             if piece_type in PST:
                 pst_score -= PST[piece_type][chess.square_mirror(sq)]
 
-    # mobility: безопасный подсчёт
+    # mobility
     mobility_count = sum(1 for _ in board.legal_moves)
     mobility = 10 * mobility_count
 
@@ -102,7 +99,7 @@ def evaluate(board: chess.Board):
     score_white = material + pst_score + mobility + check_bonus
     return score_white if board.turn == chess.WHITE else -score_white
 
-# ---- TT и state ----
+# ---- TT and state ----
 class SearchState:
     def __init__(self):
         self.tt = {}
@@ -208,11 +205,11 @@ def negamax(board: chess.Board, depth: int, alpha: int, beta: int, state: Search
             alpha = score
             # обновляем history для хода, который привёл к улучшению
             if not board.is_capture(move):
-                state.history[(mover, move.from_square, move.to_square)] += 2 ** depth
+                state.history[(mover, move.from_square, move.to_square)] += depth
 
         if alpha >= beta:
             # beta-cutoff: запомним ход
-            state.history[(mover, move.from_square, move.to_square)] += 2 ** depth
+            state.history[(mover, move.from_square, move.to_square)] += depth
             break
 
     if best_score >= beta_orig:
@@ -457,7 +454,6 @@ def uci_loop():
                     else:
                         i += 1
 
-                # остановим предыдущий поиск, если есть
                 if search_thread and search_thread.is_alive():
                     stop_event.set()
                     search_thread.join(timeout=1.0)
@@ -465,7 +461,6 @@ def uci_loop():
 
                 stop_event = threading.Event()
                 search_thread = SearchThread(board, wtime=wtime, btime=btime, winc=winc or 0, binc=binc or 0, movetime=movetime, max_depth=depth, stop_event=stop_event)
-                # запускаем асинхронно — поток сам выведет bestmove при завершении
                 search_thread.start()
 
 
@@ -473,7 +468,6 @@ def uci_loop():
                 if search_thread and search_thread.is_alive():
                     stop_event.set()
                     search_thread.join(timeout=2.0)
-                # Ничего дополнительно не печатаем — поток печатает bestmove при завершении
 
             elif cmd == "quit":
                 if search_thread and search_thread.is_alive():
