@@ -24,27 +24,28 @@ center_squares = [chess.D4, chess.E4, chess.D5, chess.E5]
 # =====================
 # Zeit → Denkzeit Mapping
 # =====================
-def calculate_think_time(remaining_time_ms):
+
+    def calculate_think_time(remaining_time_ms):
     t = remaining_time_ms / 1000  # Sekunden
 
     if t >= 1800:      # 30 Minuten
-        return random.uniform(15, 25)
+        return random.uniform(20, 30)
     elif t >= 1200:    # 20 Minuten
-        return random.uniform(12, 20)
+        return random.uniform(16, 25)
     elif t >= 600:     # 10 Minuten
-        return random.uniform(8, 15)
+        return random.uniform(12, 20)
     elif t >= 420:     # 7 Minuten
-        return random.uniform(6, 12)
+        return random.uniform(8, 15)
     elif t >= 300:     # 5 Minuten
-        return random.uniform(4, 8)
+        return random.uniform(6, 12)
     elif t >= 180:     # 3 Minuten
-        return random.uniform(5, 10)
+        return random.uniform(7, 12)
     elif t >= 60:      # 1 Minute
-        return random.uniform(1, 3)
+        return random.uniform(4, 6)
     elif t >= 30:
-        return random.uniform(0.5, 1.5)
+        return random.uniform(1, 2)
     elif t >= 10:
-        return random.uniform(0.2, 0.6)
+        return random.uniform(0.5, 1)
     else:
         return 0.05    # Panic
 
