@@ -21,7 +21,6 @@ piece_values = {
 
 center_squares = [chess.D4, chess.E4, chess.D5, chess.E5]
 
-
 # =====================
 # Zeit → Denkzeit Mapping
 # =====================
@@ -49,7 +48,9 @@ def calculate_think_time(remaining_time_ms):
     else:
         return 0.05    # Panic
 
-
+# =====================
+# Bewertungsfunktion
+# =====================
 def evaluate_board(board):
     if board.is_checkmate():
         return 10000 if board.turn == chess.BLACK else -10000
@@ -69,20 +70,26 @@ def evaluate_board(board):
         if piece:
             score += 0.2 if piece.color == chess.WHITE else -0.2
 
-    # Anti-Dame / Anti-König-Gezappel
+    # Anti-Dame (früh bewegen bestrafen)
     if board.fullmove_number < 10:
         score -= 0.3 * len(board.pieces(chess.QUEEN, chess.WHITE))
         score += 0.3 * len(board.pieces(chess.QUEEN, chess.BLACK))
 
+    # Anti-König-Gezappel / Rochade (python-chess korrekt)
     if board.fullmove_number < 15:
-        if not board.has_castled(chess.WHITE):
+        white_king_square = board.king(chess.WHITE)
+        black_king_square = board.king(chess.BLACK)
+
+        if white_king_square not in (chess.G1, chess.C1):
             score -= 0.2
-        if not board.has_castled(chess.BLACK):
+        if black_king_square not in (chess.G8, chess.C8):
             score += 0.2
 
     return score
 
-
+# =====================
+# Minimax-Suche
+# =====================
 def minimax(board, depth):
     if stop_time and time.time() > stop_time:
         return evaluate_board(board)
@@ -107,15 +114,15 @@ def minimax(board, depth):
             best = min(best, val)
         return best
 
-
+# =====================
+# Züge auswählen
+# =====================
 def choose_move(board):
     global remaining_time_ms
 
-    # Panic bei Zeitnot
     if remaining_time_ms < 1000:
         return random.choice(list(board.legal_moves))
 
-    # Zufälliger erster Zug
     if board.fullmove_number == 1:
         return random.choice(list(board.legal_moves))
 
@@ -150,7 +157,9 @@ def choose_move(board):
 
     return random.choice(best_moves) if best_moves else random.choice(list(board.legal_moves))
 
-
+# =====================
+# Hauptloop
+# =====================
 def main():
     global remaining_time_ms, stop_time
     board = chess.Board()
@@ -203,13 +212,13 @@ def main():
 
             target_think_time = calculate_think_time(remaining_time_ms)
 
-            # harter Rechenabbruch (Sicherheit)
+            # Rechenabbruch für Minimax
             stop_time = time.time() + min(target_think_time * 0.7, 3.0)
 
             start = time.time()
             move = choose_move(board)
 
-            # Warten bis Ziel-Denkzeit erreicht
+            # Warten bis Zielzeit erreicht
             elapsed = time.time() - start
             if elapsed < target_think_time:
                 time.sleep(target_think_time - elapsed)
@@ -220,7 +229,6 @@ def main():
             break
 
         sys.stdout.flush()
-
 
 if __name__ == "__main__":
     main()
