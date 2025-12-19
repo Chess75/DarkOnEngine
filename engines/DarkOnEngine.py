@@ -3,6 +3,8 @@ import sys
 import chess
 import random
 
+SPEED = 5  # 1 - too slow but smart, 10 - too fast but dumb.
+
 piece_values = {
     chess.PAWN: 1,
     chess.KNIGHT: 3,
@@ -25,39 +27,45 @@ def evaluate_board(board):
     for piece_type in piece_values:
         score += len(board.pieces(piece_type, chess.WHITE)) * piece_values[piece_type]
         score -= len(board.pieces(piece_type, chess.BLACK)) * piece_values[piece_type]
+
     for square in center_squares:
         piece = board.piece_at(square)
         if piece:
             score += 0.2 if piece.color == chess.WHITE else -0.2
+
     return score
 
+
+# ---------------- MINIMAX ----------------
 
 def minimax(board, depth):
     if depth == 0 or board.is_game_over():
         return evaluate_board(board)
 
-    legal_moves = list(board.legal_moves)
     if board.turn == chess.WHITE:
-        max_eval = -float('inf')
-        for move in legal_moves:
+        best = -float('inf')
+        for move in board.legal_moves:
             board.push(move)
-            eval = minimax(board, depth - 1)
+            best = max(best, minimax(board, depth - 1))
             board.pop()
-            if eval > max_eval:
-                max_eval = eval
-        return max_eval
+        return best
     else:
-        min_eval = float('inf')
-        for move in legal_moves:
+        best = float('inf')
+        for move in board.legal_moves:
             board.push(move)
-            eval = minimax(board, depth - 1)
+            best = min(best, minimax(board, depth - 1))
             board.pop()
-            if eval < min_eval:
-                min_eval = eval
-        return min_eval
+        return best
+
+
+def speed_to_depth():
+    return max(1, 6 - SPEED // 2)
 
 
 def choose_move(board):
+    depth = speed_to_depth()
+
+    # старт — случайный ход
     if board.fullmove_number == 1:
         return random.choice(list(board.legal_moves))
 
@@ -66,7 +74,7 @@ def choose_move(board):
 
     for move in board.legal_moves:
         board.push(move)
-        score = minimax(board, 2)
+        score = minimax(board, depth)
         board.pop()
 
         if board.turn == chess.WHITE:
@@ -85,8 +93,11 @@ def choose_move(board):
     return random.choice(best_moves) if best_moves else None
 
 
+# ---------------- UCI ----------------
+
 def main():
     board = chess.Board()
+
     while True:
         line = sys.stdin.readline()
         if not line:
@@ -97,34 +108,34 @@ def main():
             print("id name DarkOnEngine")
             print("id author Dark and Classic")
             print("uciok")
+
         elif line == "isready":
             print("readyok")
+
         elif line.startswith("ucinewgame"):
             board.reset()
+
         elif line.startswith("position"):
-            parts = line.split(" ")
+            parts = line.split()
             if "startpos" in parts:
                 board.reset()
                 if "moves" in parts:
-                    moves_index = parts.index("moves")
-                    moves = parts[moves_index + 1:]
-                    for mv in moves:
+                    idx = parts.index("moves") + 1
+                    for mv in parts[idx:]:
                         board.push_uci(mv)
             elif "fen" in parts:
-                fen_index = parts.index("fen")
-                fen_str = " ".join(parts[fen_index + 1:fen_index + 7])
-                board.set_fen(fen_str)
+                idx = parts.index("fen") + 1
+                fen = " ".join(parts[idx:idx + 6])
+                board.set_fen(fen)
                 if "moves" in parts:
-                    moves_index = parts.index("moves")
-                    moves = parts[moves_index + 1:]
-                    for mv in moves:
+                    idx = parts.index("moves") + 1
+                    for mv in parts[idx:]:
                         board.push_uci(mv)
+
         elif line.startswith("go"):
             move = choose_move(board)
-            if move is not None:
-                print("bestmove", move.uci())
-            else:
-                print("bestmove 0000")
+            print("bestmove", move.uci() if move else "0000")
+
         elif line == "quit":
             break
 
