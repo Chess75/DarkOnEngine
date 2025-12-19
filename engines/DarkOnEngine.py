@@ -22,8 +22,35 @@ piece_values = {
 center_squares = [chess.D4, chess.E4, chess.D5, chess.E5]
 
 
+# =====================
+# Zeit → Denkzeit Mapping
+# =====================
+def calculate_think_time(remaining_time_ms):
+    t = remaining_time_ms / 1000  # Sekunden
+
+    if t >= 1800:      # 30 Minuten
+        return random.uniform(15, 25)
+    elif t >= 1200:    # 20 Minuten
+        return random.uniform(12, 20)
+    elif t >= 600:     # 10 Minuten
+        return random.uniform(8, 15)
+    elif t >= 420:     # 7 Minuten
+        return random.uniform(6, 12)
+    elif t >= 300:     # 5 Minuten
+        return random.uniform(4, 8)
+    elif t >= 180:     # 3 Minuten
+        return random.uniform(5, 10)
+    elif t >= 60:      # 1 Minute
+        return random.uniform(1, 3)
+    elif t >= 30:
+        return random.uniform(0.5, 1.5)
+    elif t >= 10:
+        return random.uniform(0.2, 0.6)
+    else:
+        return 0.05    # Panic
+
+
 def evaluate_board(board):
-    # Matt / Patt
     if board.is_checkmate():
         return 10000 if board.turn == chess.BLACK else -10000
     if board.is_stalemate():
@@ -42,16 +69,11 @@ def evaluate_board(board):
         if piece:
             score += 0.2 if piece.color == chess.WHITE else -0.2
 
-    # ============================
     # Anti-Dame / Anti-König-Gezappel
-    # ============================
-
-    # Dame früh bewegen bestrafen
     if board.fullmove_number < 10:
         score -= 0.3 * len(board.pieces(chess.QUEEN, chess.WHITE))
         score += 0.3 * len(board.pieces(chess.QUEEN, chess.BLACK))
 
-    # König vor Rochade bewegen bestrafen
     if board.fullmove_number < 15:
         if not board.has_castled(chess.WHITE):
             score -= 0.2
@@ -62,39 +84,34 @@ def evaluate_board(board):
 
 
 def minimax(board, depth):
-    # Zeitabbruch
     if stop_time and time.time() > stop_time:
         return evaluate_board(board)
 
     if depth == 0 or board.is_game_over():
         return evaluate_board(board)
 
-    legal_moves = list(board.legal_moves)
-
     if board.turn == chess.WHITE:
-        max_eval = -float('inf')
-        for move in legal_moves:
+        best = -float('inf')
+        for move in board.legal_moves:
             board.push(move)
-            eval = minimax(board, depth - 1)
+            val = minimax(board, depth - 1)
             board.pop()
-            if eval > max_eval:
-                max_eval = eval
-        return max_eval
+            best = max(best, val)
+        return best
     else:
-        min_eval = float('inf')
-        for move in legal_moves:
+        best = float('inf')
+        for move in board.legal_moves:
             board.push(move)
-            eval = minimax(board, depth - 1)
+            val = minimax(board, depth - 1)
             board.pop()
-            if eval < min_eval:
-                min_eval = eval
-        return min_eval
+            best = min(best, val)
+        return best
 
 
 def choose_move(board):
     global remaining_time_ms
 
-    # Panikmodus bei Zeitnot → absichtlich schlecht
+    # Panic bei Zeitnot
     if remaining_time_ms < 1000:
         return random.choice(list(board.legal_moves))
 
@@ -102,8 +119,7 @@ def choose_move(board):
     if board.fullmove_number == 1:
         return random.choice(list(board.legal_moves))
 
-    # Feste schwache Tiefe
-    depth = 2
+    depth = 2  # bewusst schwach
 
     best_score = -float('inf') if board.turn == chess.WHITE else float('inf')
     best_moves = []
@@ -116,7 +132,7 @@ def choose_move(board):
         score = minimax(board, depth)
         board.pop()
 
-        # Leichte Zufälligkeit (macht menschlich & schwach)
+        # Menschliche Ungenauigkeit
         score += random.uniform(-0.15, 0.15)
 
         if board.turn == chess.WHITE:
@@ -132,15 +148,11 @@ def choose_move(board):
             elif score == best_score:
                 best_moves.append(move)
 
-    if best_moves:
-        return random.choice(best_moves)
-
-    return random.choice(list(board.legal_moves))
+    return random.choice(best_moves) if best_moves else random.choice(list(board.legal_moves))
 
 
 def main():
     global remaining_time_ms, stop_time
-
     board = chess.Board()
 
     while True:
@@ -165,16 +177,14 @@ def main():
             if "startpos" in parts:
                 board.reset()
                 if "moves" in parts:
-                    moves = parts[parts.index("moves") + 1:]
-                    for mv in moves:
+                    for mv in parts[parts.index("moves") + 1:]:
                         board.push_uci(mv)
             elif "fen" in parts:
                 fen_index = parts.index("fen")
-                fen_str = " ".join(parts[fen_index + 1:fen_index + 7])
-                board.set_fen(fen_str)
+                fen = " ".join(parts[fen_index + 1:fen_index + 7])
+                board.set_fen(fen)
                 if "moves" in parts:
-                    moves = parts[parts.index("moves") + 1:]
-                    for mv in moves:
+                    for mv in parts[parts.index("moves") + 1:]:
                         board.push_uci(mv)
 
         elif line.startswith("go"):
@@ -191,11 +201,19 @@ def main():
             elif board.turn == chess.BLACK and btime is not None:
                 remaining_time_ms = btime
 
-            # 2 % der Restzeit (min 50 ms, max 2000 ms)
-            think_time_ms = max(50, min(2000, int(remaining_time_ms * 0.02)))
-            stop_time = time.time() + think_time_ms / 1000
+            target_think_time = calculate_think_time(remaining_time_ms)
 
+            # harter Rechenabbruch (Sicherheit)
+            stop_time = time.time() + min(target_think_time * 0.7, 3.0)
+
+            start = time.time()
             move = choose_move(board)
+
+            # Warten bis Ziel-Denkzeit erreicht
+            elapsed = time.time() - start
+            if elapsed < target_think_time:
+                time.sleep(target_think_time - elapsed)
+
             print("bestmove", move.uci() if move else "0000")
 
         elif line == "quit":
