@@ -23,7 +23,7 @@ piece_values = {
 center_squares = [chess.D4, chess.E4, chess.D5, chess.E5]
 
 # =====================
-# Zeit → Denkzeit Mapping (angepasst, langsamer)
+# Zeit → Denkzeit Mapping
 # =====================
 def calculate_think_time(remaining_time_ms):
     t = remaining_time_ms / 1000  # Sekunden
@@ -40,7 +40,7 @@ def calculate_think_time(remaining_time_ms):
         return random.uniform(1, 4)
     elif t >= 3:       # 3 Sekunden
         return random.uniform(0.5, 2)
-    else:              # < 15 Sekunden
+    else:              # < 3 Sekunden
         return 0.02
 
 # =====================
@@ -70,15 +70,14 @@ def evaluate_board(board):
         score -= 0.3 * len(board.pieces(chess.QUEEN, chess.WHITE))
         score += 0.3 * len(board.pieces(chess.QUEEN, chess.BLACK))
 
-    # Anti-König-Gezappel / Rochade (python-chess korrekt)
-    if board.fullmove_number < 15:
+    # König in Eröffnung stark bestrafen
+    if board.fullmove_number < 10:
         white_king_square = board.king(chess.WHITE)
         black_king_square = board.king(chess.BLACK)
-
         if white_king_square not in (chess.G1, chess.C1):
-            score -= 0.2
+            score -= 5.0
         if black_king_square not in (chess.G8, chess.C8):
-            score += 0.2
+            score += 5.0
 
     return score
 
@@ -95,6 +94,9 @@ def minimax(board, depth):
     if board.turn == chess.WHITE:
         best = -float('inf')
         for move in board.legal_moves:
+            # Königzüge in den ersten 10 Zügen blockieren
+            if board.fullmove_number < 10 and board.piece_at(move.from_square).piece_type == chess.KING:
+                continue
             board.push(move)
             val = minimax(board, depth - 1)
             board.pop()
@@ -103,6 +105,8 @@ def minimax(board, depth):
     else:
         best = float('inf')
         for move in board.legal_moves:
+            if board.fullmove_number < 10 and board.piece_at(move.from_square).piece_type == chess.KING:
+                continue
             board.push(move)
             val = minimax(board, depth - 1)
             board.pop()
@@ -122,7 +126,7 @@ def choose_move(board):
         return random.choice(list(board.legal_moves))
 
     # ---------------------
-    # Dynamische Tiefe mit „Zwischenwerten“
+    # Dynamische Tiefe mit Zwischenwerten
     # ---------------------
     if remaining_time_ms < 15000:          # < 15 s
         depth = 2
@@ -148,13 +152,17 @@ def choose_move(board):
         if stop_time and time.time() > stop_time:
             break
 
+        # Königzüge in Eröffnung überspringen
+        if board.fullmove_number < 10 and board.piece_at(move.from_square).piece_type == chess.KING:
+            continue
+
         board.push(move)
         score = minimax(board, depth)
         board.pop()
 
         # Menschliche Ungenauigkeit basierend auf Strength-Profile
         if strength_profile == "weak":
-            score += random.uniform(-0.15, 0.15)
+            score += random.uniform(-0.1, 0.1)
         else:  # normal schwach
             score += random.uniform(-0.05, 0.05)
 
@@ -170,6 +178,10 @@ def choose_move(board):
                 best_moves = [move]
             elif score == best_score:
                 best_moves.append(move)
+
+    # Wenn keine zulässigen Züge nach King-Schutz, dann legalen nehmen
+    if not best_moves:
+        best_moves = [move for move in board.legal_moves]
 
     return random.choice(best_moves) if best_moves else random.choice(list(board.legal_moves))
 
