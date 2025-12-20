@@ -59,23 +59,31 @@ def evaluate_board(board):
 
     score = 0
 
+    # ------------------------
     # Material
+    # ------------------------
     for piece_type in piece_values:
         score += len(board.pieces(piece_type, chess.WHITE)) * piece_values[piece_type]
         score -= len(board.pieces(piece_type, chess.BLACK)) * piece_values[piece_type]
 
+    # ------------------------
     # Zentrum
+    # ------------------------
     for square in center_squares:
         piece = board.piece_at(square)
         if piece:
             score += 0.2 if piece.color == chess.WHITE else -0.2
 
+    # ------------------------
     # Anti-Dame (früh bewegen bestrafen)
+    # ------------------------
     if board.fullmove_number < 10:
         score -= 1.5 * len(board.pieces(chess.QUEEN, chess.WHITE))
         score += 1.5 * len(board.pieces(chess.QUEEN, chess.BLACK))
 
+    # ------------------------
     # Anti-König-Gezappel / Rochade (python-chess korrekt)
+    # ------------------------
     if board.fullmove_number < 15:
         white_king_square = board.king(chess.WHITE)
         black_king_square = board.king(chess.BLACK)
@@ -85,7 +93,25 @@ def evaluate_board(board):
         if black_king_square not in (chess.G8, chess.C8):
             score += 5.0
 
+    # ------------------------
+    # Strafe für einzügige Materialverluste
+    # ------------------------
+    for move in board.legal_moves:
+        board.push(move)
+        to_sq = move.to_square  # Figur landet hier
+        piece = board.piece_at(to_sq)
+        if piece:
+            attackers = board.attackers(not piece.color, to_sq)
+            if attackers:
+                penalty = piece_values[piece.piece_type] * 5  # stark bestrafen
+                if piece.color == chess.WHITE:
+                    score -= penalty
+                else:
+                    score += penalty
+        board.pop()
+
     return score
+
 
 # =====================
 # Minimax-Suche
