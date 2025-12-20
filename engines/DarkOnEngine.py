@@ -125,19 +125,19 @@ def choose_move(board):
     # Dynamische Tiefe mit „Zwischenwerten“
     # ---------------------
     if remaining_time_ms < 15000:          # < 15 s
-        depth = 1
-    elif remaining_time_ms < 60000:        # < 1 min
-        depth = 1
-        if random.random() < 0.5:
-            depth = 2
-    elif remaining_time_ms < 180000:       # < 3 min
         depth = 2
-    elif remaining_time_ms < 600000:       # < 10 min
+    elif remaining_time_ms < 60000:        # < 1 min
         depth = 2
         if random.random() < 0.5:
             depth = 3
-    elif remaining_time_ms < 1800000:      # < 30 min
+    elif remaining_time_ms < 180000:       # < 3 min
         depth = 3
+    elif remaining_time_ms < 600000:       # < 10 min
+        depth = 3
+        if random.random() < 0.5:
+            depth = 4
+    elif remaining_time_ms < 1800000:      # < 30 min
+        depth = 4
     else:                                  # 30+ min
         depth = 3
 
