@@ -92,7 +92,6 @@ def mvv_lva_score(board, move):
         score += PIECE_VALUES[chess.QUEEN] // 2
     return score
 
-# ---- Оценка позиции ----
 
 def evaluate(board: chess.Board):
 
@@ -118,7 +117,7 @@ def evaluate(board: chess.Board):
 
     score_white = material + pst_score
 
-    # --- Mobility (безопасно) ---
+    # --- Mobility ---
     mobility = 5 * sum(1 for _ in board.legal_moves)
     score_white += mobility
 
@@ -126,25 +125,24 @@ def evaluate(board: chess.Board):
     if board.is_check():
         score_white -= 50
 
-    # --- Castling ---
-    CASTLE_BONUS = 40
-    NO_CASTLE_PENALTY = 20
+    # FIX KING
+    CASTLE_BONUS = 35
+    EARLY_KING_PENALTY = 60
+
+    wk = board.king(chess.WHITE)
+    bk = board.king(chess.BLACK)
 
     # White
-    if not (board.has_kingside_castling_rights(chess.WHITE) or
-            board.has_queenside_castling_rights(chess.WHITE)):
-        if board.king(chess.WHITE) != chess.E1:
-            score_white += CASTLE_BONUS
-        else:
-            score_white -= NO_CASTLE_PENALTY
+    if wk == chess.G1 or wk == chess.C1:
+        score_white += CASTLE_BONUS
+    elif wk != chess.E1 and board.fullmove_number < 10:
+        score_white -= EARLY_KING_PENALTY
 
     # Black
-    if not (board.has_kingside_castling_rights(chess.BLACK) or
-            board.has_queenside_castling_rights(chess.BLACK)):
-        if board.king(chess.BLACK) != chess.E8:
-            score_white -= CASTLE_BONUS
-        else:
-            score_white += NO_CASTLE_PENALTY
+    if bk == chess.G8 or bk == chess.C8:
+        score_white -= CASTLE_BONUS
+    elif bk != chess.E8 and board.fullmove_number < 10:
+        score_white += EARLY_KING_PENALTY
 
     # --- Development ---
     DEV_PENALTY = 10
@@ -157,22 +155,17 @@ def evaluate(board: chess.Board):
         if board.piece_at(sq):
             score_white += DEV_PENALTY
 
-    # --- King in center after opening ---
+    # --- King in center AFTER opening ---
     if board.fullmove_number > 10:
-        wk = board.king(chess.WHITE)
-        bk = board.king(chess.BLACK)
-
         if wk in (chess.E1, chess.D1, chess.E2, chess.D2):
             score_white -= 30
-
         if bk in (chess.E8, chess.D8, chess.E7, chess.D7):
             score_white += 30
 
-    # --- Return from side-to-move ---
+    # --- Return from side to move ---
     return score_white if board.turn == chess.WHITE else -score_white
 
-
-# ---- TT и state ----
+# ---- TT and state ----
 class SearchState:
     def __init__(self):
         self.tt = {}
