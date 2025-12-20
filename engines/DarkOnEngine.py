@@ -114,34 +114,25 @@ def minimax(board, depth):
             best = min(best, val)
         return best
 
-# =====================
-# Züge auswählen
-# =====================
+#Globale Liste speichern, welche Figuren zuletzt bewegt wurden
+last_moves = []  # speichert chess.Piece Objekte der letzten Züge
+
 def choose_move(board):
-    global remaining_time_ms
-
-    if remaining_time_ms < 1000:
-        return random.choice(list(board.legal_moves))
-
-    if board.fullmove_number == 1:
-        return random.choice(list(board.legal_moves))
-
-    depth = 3  # bewusst schwach
+    global last_moves
 
     best_score = -float('inf') if board.turn == chess.WHITE else float('inf')
     best_moves = []
 
     for move in board.legal_moves:
-        if stop_time and time.time() > stop_time:
-            break
+        piece = board.piece_at(move.from_square)
 
-        board.push(move)
-        score = minimax(board, depth)
-        board.pop()
+        # Strafe, wenn diese Figur in den letzten 3 Zügen bewegt wurde
+        if piece in last_moves[-3:]:
+            score = -1000  # extrem niedriger Score, damit Bot anderen Zug wählt
+        else:
+            score = minimax(board, depth)  # normale Bewertung
 
-        # Menschliche Ungenauigkeit
-        score += random.uniform(-0.15, 0.15)
-
+        # Score in best_moves einfügen wie gewohnt
         if board.turn == chess.WHITE:
             if score > best_score:
                 best_score = score
@@ -155,7 +146,15 @@ def choose_move(board):
             elif score == best_score:
                 best_moves.append(move)
 
-    return random.choice(best_moves) if best_moves else random.choice(list(board.legal_moves))
+    chosen_move = random.choice(best_moves)
+
+    # Letzte Züge aktualisieren
+    moved_piece = board.piece_at(chosen_move.from_square)
+    last_moves.append(moved_piece)
+    if len(last_moves) > 10:  # nur die letzten 10 merken
+        last_moves.pop(0)
+
+    return chosen_move
 
 # =====================
 # Hauptloop
