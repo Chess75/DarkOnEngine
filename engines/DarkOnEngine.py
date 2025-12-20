@@ -5,12 +5,10 @@ import random
 import time
 
 # =====================
-# Globale Variablen
+# Globale Zeitvariablen
 # =====================
 remaining_time_ms = 10000
 stop_time = None
-strength_profile = "weak"  # "weak" oder "normal"
-last_moves = []  # Letzte bewegte Figuren speichern
 
 piece_values = {
     chess.PAWN: 1,
@@ -24,7 +22,7 @@ piece_values = {
 center_squares = [chess.D4, chess.E4, chess.D5, chess.E5]
 
 # =====================
-# Denkzeit abhängig von Restzeit
+# Zeit → Denkzeit Mapping (angepasst, langsamer)
 # =====================
 def calculate_think_time(remaining_time_ms):
     t = remaining_time_ms / 1000  # Sekunden
@@ -48,7 +46,7 @@ def calculate_think_time(remaining_time_ms):
     elif t >= 10:
         return random.uniform(0.5, 1)
     else:
-        return 0.05
+        return 0.05    # Panic
 
 # =====================
 # Bewertungsfunktion
@@ -77,7 +75,7 @@ def evaluate_board(board):
         score -= 1.5 * len(board.pieces(chess.QUEEN, chess.WHITE))
         score += 1.5 * len(board.pieces(chess.QUEEN, chess.BLACK))
 
-    # Anti-König-Gezappel / Rochade
+    # Anti-König-Gezappel / Rochade (python-chess korrekt)
     if board.fullmove_number < 15:
         white_king_square = board.king(chess.WHITE)
         black_king_square = board.king(chess.BLACK)
@@ -120,7 +118,7 @@ def minimax(board, depth):
 # Züge auswählen
 # =====================
 def choose_move(board):
-    global remaining_time_ms, last_moves
+    global remaining_time_ms
 
     if remaining_time_ms < 1000:
         return random.choice(list(board.legal_moves))
@@ -128,43 +126,21 @@ def choose_move(board):
     if board.fullmove_number == 1:
         return random.choice(list(board.legal_moves))
 
-    # Dynamische Tiefe
-    if remaining_time_ms < 15000:
-        depth = 2
-    elif remaining_time_ms < 60000:
-        depth = random.choice([2,3])
-    elif remaining_time_ms < 180000:
-        depth = 3
-    elif remaining_time_ms < 600000:
-        depth = random.choice([3,4])
-    else:
-        depth = 4
+    depth = 2  # bewusst schwach
 
     best_score = -float('inf') if board.turn == chess.WHITE else float('inf')
     best_moves = []
 
     for move in board.legal_moves:
-        piece = board.piece_at(move.from_square)
-
-        # König in Eröffnung nicht bewegen
-        if board.fullmove_number < 10 and piece.piece_type == chess.KING:
-            continue
+        if stop_time and time.time() > stop_time:
+            break
 
         board.push(move)
         score = minimax(board, depth)
         board.pop()
 
-        # Prüfen, ob die gezogene Figur sofort angegriffen wird
-        piece_after = board.piece_at(move.to_square)
-        if piece_after and board.is_attacked_by(not piece_after.color, move.to_square):
-            score -= piece_values[piece_after.piece_type] * 5  # stark bestrafen
-
-        # Keine Wiederholung: Figur in den letzten 3 Zügen bewegt?
-        if piece in last_moves[-3:]:
-            score -= 2.0
-
-        # Kleine menschliche Fehler
-        score += random.uniform(-0.05, 0.05)
+        # Menschliche Ungenauigkeit
+        score += random.uniform(-0.15, 0.15)
 
         if board.turn == chess.WHITE:
             if score > best_score:
@@ -179,18 +155,7 @@ def choose_move(board):
             elif score == best_score:
                 best_moves.append(move)
 
-    if not best_moves:
-        best_moves = [m for m in board.legal_moves]
-
-    chosen_move = random.choice(best_moves)
-
-    # Letzte Züge aktualisieren
-    moved_piece = board.piece_at(chosen_move.from_square)
-    last_moves.append(moved_piece)
-    if len(last_moves) > 10:
-        last_moves.pop(0)
-
-    return chosen_move
+    return random.choice(best_moves) if best_moves else random.choice(list(board.legal_moves))
 
 # =====================
 # Hauptloop
@@ -259,11 +224,6 @@ def main():
                 time.sleep(target_think_time - elapsed)
 
             print("bestmove", move.uci() if move else "0000")
-
-        elif line.startswith("setoption name Strength value"):
-            val = line.split()[-1].lower()
-            if val in ("weak", "normal"):
-                strength_profile = val
 
         elif line == "quit":
             break
