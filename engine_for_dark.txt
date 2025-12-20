@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
-
 import chess
+import random
 import sys
 import time
 import threading
@@ -45,17 +45,37 @@ PST = {
 TTEntry = namedtuple("TTEntry", ["depth", "flag", "score", "best_move"])
 # flag: 'EXACT', 'LOWER', 'UPPER'
 
-# ---- Утилиты ----
+def calculate_think_time(remaining_time_ms):
+    t = remaining_time_ms / 1000  # seconds
+
+    if t >= 1800:      # 30 minutes
+        return random.uniform(20, 30)
+    elif t >= 1200:    # 20 minutes
+        return random.uniform(16, 25)
+    elif t >= 600:     # 10 minutes
+        return random.uniform(12, 20)
+    elif t >= 420:     # 7 minutes
+        return random.uniform(8, 15)
+    elif t >= 300:     # 5 minutes
+        return random.uniform(6, 12)
+    elif t >= 180:     # 3 minutes
+        return random.uniform(7, 12)
+    elif t >= 60:      # 1 minute
+        return random.uniform(4, 6)
+    elif t >= 30:
+        return random.uniform(1, 2)
+    elif t >= 3:
+        return random.uniform(0.5, 1)
+    else:
+        return 0.00    # panic
+
 
 def fast_board_key(board: chess.Board):
     return (board.board_fen(), board.turn, board.castling_xfen(), board.ep_square, board.halfmove_clock)
 
 
 def mvv_lva_score(board, move):
-    """
-    MVV-LVA с учётом en-passant (если применимо) и премией за промоцию.
-    Чем выше — тем раньше ход.
-    """
+
     score = 0
     if board.is_capture(move):
         # определить жертву: для en-passant жертва — пешка не на to_square
@@ -301,30 +321,18 @@ class SearchThread(threading.Thread):
         if self.movetime:
             return self.movetime
 
-        # определяем оставшееся время
         if self.root_board.turn == chess.WHITE:
             remaining = self.wtime
-            inc = self.winc
         else:
             remaining = self.btime
-            inc = self.binc
 
         if remaining is None:
-            return 10000
+            return 500  # 0.5 sec fallback
 
-        # ---- PANIC MODE (флаг падает) ----
-        # при <= 1 секунде поиск не имеет смысла
-        if remaining <= 1000:
-            return 0
+        think_sec = calculate_think_time(remaining)
 
-        # ---- LOW TIME MODE ----
-        # быстрый, неглубокий поиск
-        if remaining <= 3000:
-            return max(20, remaining // 40)
-
-        # ---- NORMAL MODE ----
-        # стандартное поведение, как было
-        return max(20, remaining // 20 + inc * 2)
+        # safety: minimum thinking time
+        return int(max(0.05, think_sec) * 1000)
 
     def run(self):
         ms = self.time_remaining_ms()
@@ -543,3 +551,4 @@ def uci_loop():
 
 if __name__ == "__main__":
     uci_loop()
+
