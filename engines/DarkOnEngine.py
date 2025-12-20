@@ -22,7 +22,6 @@ piece_values = {
 
 center_squares = [chess.D4, chess.E4, chess.D5, chess.E5]
 
-# Eröffnungszüge priorisieren
 development_squares_white = [chess.B1, chess.G1, chess.C1, chess.F1]
 development_squares_black = [chess.B8, chess.G8, chess.C8, chess.F8]
 
@@ -47,7 +46,7 @@ def calculate_think_time(remaining_time_ms):
         return 0.02
 
 # =====================
-# Bewertungsfunktion
+# Bewertungsfunktion inkl. einzügige Materialverlust-Prävention
 # =====================
 def evaluate_board(board):
     score = 0
@@ -60,7 +59,7 @@ def evaluate_board(board):
         if piece:
             score += 0.2 if piece.color == chess.WHITE else -0.2
 
-    # Eröffnungsentwicklung
+    # Eröffnung: Figurenentwicklung fördern
     if board.fullmove_number <= 5:
         for sq in development_squares_white:
             p = board.piece_at(sq)
@@ -71,13 +70,17 @@ def evaluate_board(board):
             if p and p.color == chess.BLACK:
                 score -= 0.3
 
-    # Blunder-Vermeidung
-    for square in chess.SQUARES:
-        piece = board.piece_at(square)
-        if piece and piece.color == board.turn:
-            attackers = board.attackers(not board.turn, square)
-            if attackers:
-                score -= 0.5 if strength_profile == "weak" else 2.0
+    # Blunder: Prüfen, ob eigene Figuren sofort geschlagen werden können
+    for move in board.legal_moves:
+        board.push(move)
+        for sq in chess.SQUARES:
+            piece = board.piece_at(sq)
+            if piece and piece.color == board.turn:
+                attackers = board.attackers(not board.turn, sq)
+                if attackers:
+                    # sehr stark bestrafen, wenn piece sofort geschlagen werden kann
+                    score -= 5.0
+        board.pop()
 
     return score
 
@@ -132,7 +135,7 @@ def choose_move(board):
     else:
         depth = 4
 
-    # Versuche, Entwicklungszüge zu bevorzugen
+    # Entwicklungszüge priorisieren
     development_squares = development_squares_white if board.turn == chess.WHITE else development_squares_black
     dev_moves = [m for m in board.legal_moves if m.from_square in development_squares]
     if dev_moves:
