@@ -72,8 +72,8 @@ def evaluate_board(board):
 
     # Anti-Dame (früh bewegen bestrafen)
     if board.fullmove_number < 10:
-        score -= 1.5 * len(board.pieces(chess.QUEEN, chess.WHITE))
-        score += 1.5 * len(board.pieces(chess.QUEEN, chess.BLACK))
+        score -= 0.3 * len(board.pieces(chess.QUEEN, chess.WHITE))
+        score += 0.3 * len(board.pieces(chess.QUEEN, chess.BLACK))
 
     # Anti-König-Gezappel / Rochade (python-chess korrekt)
     if board.fullmove_number < 15:
@@ -81,9 +81,9 @@ def evaluate_board(board):
         black_king_square = board.king(chess.BLACK)
 
         if white_king_square not in (chess.G1, chess.C1):
-            score -= 5.0
+            score -= 0.2
         if black_king_square not in (chess.G8, chess.C8):
-            score += 5.0
+            score += 0.2
 
     return score
 
