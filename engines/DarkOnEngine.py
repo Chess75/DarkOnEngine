@@ -31,15 +31,17 @@ def calculate_think_time(remaining_time_ms):
     if t >= 1800:      # 30 Minuten
         return random.uniform(20, 60)
     elif t >= 600:     # 10 Minuten
-        return random.uniform(12, 40)
+        return random.uniform(10, 40)
     elif t >= 180:     # 3 Minuten
-        return random.uniform(7, 20)
+        return random.uniform(3, 20)
     elif t >= 60:      # 1 Minute
-        return random.uniform(3, 10)
+        return random.uniform(1, 10)
     elif t >= 15:      # 15 Sekunden
         return random.uniform(1, 4)
+    elif t >= 3:       # 3 Sekunden
+        return random.uniform(0.5, 2)
     else:              # < 15 Sekunden
-        return 0.05
+        return 0.02
 
 # =====================
 # Bewertungsfunktion
