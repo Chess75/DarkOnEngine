@@ -5,7 +5,7 @@ import random
 import time
 
 # =====================
-# Globale Zeitvariablen
+# Globale Variablen
 # =====================
 remaining_time_ms = 10000
 stop_time = None
@@ -23,21 +23,21 @@ piece_values = {
 center_squares = [chess.D4, chess.E4, chess.D5, chess.E5]
 
 # =====================
-# Zeit → Denkzeit Mapping
+# Denkzeit basierend auf Restzeit
 # =====================
 def calculate_think_time(remaining_time_ms):
-    t = remaining_time_ms / 1000  # Sekunden
-    if t >= 1800:      # 30 Minuten
+    t = remaining_time_ms / 1000
+    if t >= 1800:
         return random.uniform(20, 60)
-    elif t >= 600:     # 10 Minuten
+    elif t >= 600:
         return random.uniform(10, 40)
-    elif t >= 180:     # 3 Minuten
+    elif t >= 180:
         return random.uniform(3, 20)
-    elif t >= 60:      # 1 Minute
+    elif t >= 60:
         return random.uniform(1, 10)
-    elif t >= 15:      # 15 Sekunden
+    elif t >= 15:
         return random.uniform(1, 4)
-    elif t >= 3:       # 3 Sekunden
+    elif t >= 3:
         return random.uniform(0.5, 2)
     else:
         return 0.02
@@ -59,30 +59,24 @@ def evaluate_board(board):
         if piece:
             score += 0.2 if piece.color == chess.WHITE else -0.2
 
-    # Anti-Dame / Anti-König
+    # Anti-Dame / König in Eröffnung
     if board.fullmove_number < 10:
-        white_king_square = board.king(chess.WHITE)
-        black_king_square = board.king(chess.BLACK)
-        if white_king_square not in (chess.G1, chess.C1):
+        wk = board.king(chess.WHITE)
+        bk = board.king(chess.BLACK)
+        if wk not in (chess.G1, chess.C1):
             score -= 5.0
-        if black_king_square not in (chess.G8, chess.C8):
+        if bk not in (chess.G8, chess.C8):
             score += 5.0
-        # Anti-Dame
         score -= 0.3 * len(board.pieces(chess.QUEEN, chess.WHITE))
         score += 0.3 * len(board.pieces(chess.QUEEN, chess.BLACK))
 
-    # ===========================
-    # Blunder-Vermeidung: Einzügige Figurenverluste
-    # ===========================
+    # Blunder-Strafe: Einzügige Verluste vermeiden
     for square in chess.SQUARES:
         piece = board.piece_at(square)
         if piece and piece.color == board.turn:
             attackers = board.attackers(not board.turn, square)
             if attackers:
-                if strength_profile == "weak":
-                    score -= 0.5  # schwache Profile können ab und zu verlieren
-                else:
-                    score -= 2.0  # normal: stark bestraft
+                score -= 0.5 if strength_profile == "weak" else 2.0
 
     return score
 
@@ -125,20 +119,17 @@ def choose_move(board):
     if remaining_time_ms < 1000 or board.fullmove_number == 1:
         return random.choice(list(board.legal_moves))
 
-    # Dynamische Tiefe basierend auf verbleibender Zeit
-if remaining_time_ms < 15000:          # < 15 s
-    depth = 2
-elif remaining_time_ms < 60000:        # < 1 min
-    depth = random.choice([2, 3])
-elif remaining_time_ms < 180000:       # < 3 min
-    depth = 3
-elif remaining_time_ms < 600000:       # < 10 min
-    depth = random.choice([3, 4])
-elif remaining_time_ms < 1800000:      # < 30 min
-    depth = 4
-else:                                  # 30+ min
-    depth = 4
-
+    # Dynamische Tiefe, vereinfacht
+    if remaining_time_ms < 15000:
+        depth = 2
+    elif remaining_time_ms < 60000:
+        depth = random.choice([2, 3])
+    elif remaining_time_ms < 180000:
+        depth = 3
+    elif remaining_time_ms < 600000:
+        depth = random.choice([3, 4])
+    else:
+        depth = 4
 
     best_score = -float('inf') if board.turn == chess.WHITE else float('inf')
     best_moves = []
@@ -146,7 +137,6 @@ else:                                  # 30+ min
     for move in board.legal_moves:
         if stop_time and time.time() > stop_time:
             break
-
         if board.fullmove_number < 10 and board.piece_at(move.from_square).piece_type == chess.KING:
             continue
 
@@ -154,7 +144,6 @@ else:                                  # 30+ min
         score = minimax(board, depth)
         board.pop()
 
-        # Zufall, schwach vs normal
         if strength_profile == "weak":
             score += random.uniform(-0.1, 0.1)
         else:
@@ -195,44 +184,38 @@ def main():
             print("id name DarkOnEngine")
             print("id author Dark and Classic")
             print("uciok")
-
         elif line == "isready":
             print("readyok")
-
         elif line.startswith("ucinewgame"):
             board.reset()
-
         elif line.startswith("position"):
             parts = line.split()
             if "startpos" in parts:
                 board.reset()
                 if "moves" in parts:
-                    for mv in parts[parts.index("moves") + 1:]:
+                    for mv in parts[parts.index("moves")+1:]:
                         board.push_uci(mv)
             elif "fen" in parts:
                 fen_index = parts.index("fen")
-                fen = " ".join(parts[fen_index + 1:fen_index + 7])
+                fen = " ".join(parts[fen_index+1:fen_index+7])
                 board.set_fen(fen)
                 if "moves" in parts:
-                    for mv in parts[parts.index("moves") + 1:]:
+                    for mv in parts[parts.index("moves")+1:]:
                         board.push_uci(mv)
-
         elif line.startswith("go"):
             parts = line.split()
             wtime = btime = None
-
             if "wtime" in parts:
-                wtime = int(parts[parts.index("wtime") + 1])
+                wtime = int(parts[parts.index("wtime")+1])
             if "btime" in parts:
-                btime = int(parts[parts.index("btime") + 1])
-
+                btime = int(parts[parts.index("btime")+1])
             if board.turn == chess.WHITE and wtime is not None:
                 remaining_time_ms = wtime
             elif board.turn == chess.BLACK and btime is not None:
                 remaining_time_ms = btime
 
             target_think_time = calculate_think_time(remaining_time_ms)
-            stop_time = time.time() + min(target_think_time * 0.7, 3.0)
+            stop_time = time.time() + min(target_think_time*0.7, 3.0)
 
             start = time.time()
             move = choose_move(board)
@@ -241,12 +224,10 @@ def main():
                 time.sleep(target_think_time - elapsed)
 
             print("bestmove", move.uci() if move else "0000")
-
         elif line.startswith("setoption name Strength value"):
             val = line.split()[-1].lower()
             if val in ("weak", "normal"):
                 strength_profile = val
-
         elif line == "quit":
             break
 
