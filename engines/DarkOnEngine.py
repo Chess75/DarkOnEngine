@@ -43,10 +43,10 @@ def calculate_think_time(remaining_time_ms):
         return random.uniform(4, 6)
     elif t >= 30:
         return random.uniform(1, 2)
-    elif t >= 10:
+    elif t >= 3:
         return random.uniform(0.5, 1)
     else:
-        return 0.05    # Panic
+        return 0.00    # Panic
 
 # =====================
 # Bewertungsfunktion
