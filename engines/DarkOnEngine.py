@@ -59,31 +59,23 @@ def evaluate_board(board):
 
     score = 0
 
-    # ------------------------
     # Material
-    # ------------------------
     for piece_type in piece_values:
         score += len(board.pieces(piece_type, chess.WHITE)) * piece_values[piece_type]
         score -= len(board.pieces(piece_type, chess.BLACK)) * piece_values[piece_type]
 
-    # ------------------------
     # Zentrum
-    # ------------------------
     for square in center_squares:
         piece = board.piece_at(square)
         if piece:
             score += 0.2 if piece.color == chess.WHITE else -0.2
 
-    # ------------------------
     # Anti-Dame (früh bewegen bestrafen)
-    # ------------------------
     if board.fullmove_number < 10:
         score -= 1.5 * len(board.pieces(chess.QUEEN, chess.WHITE))
         score += 1.5 * len(board.pieces(chess.QUEEN, chess.BLACK))
 
-    # ------------------------
     # Anti-König-Gezappel / Rochade (python-chess korrekt)
-    # ------------------------
     if board.fullmove_number < 15:
         white_king_square = board.king(chess.WHITE)
         black_king_square = board.king(chess.BLACK)
@@ -93,25 +85,7 @@ def evaluate_board(board):
         if black_king_square not in (chess.G8, chess.C8):
             score += 5.0
 
-    # ------------------------
-    # Strafe für einzügige Materialverluste
-    # ------------------------
-    for move in board.legal_moves:
-        board.push(move)
-        to_sq = move.to_square  # Figur landet hier
-        piece = board.piece_at(to_sq)
-        if piece:
-            attackers = board.attackers(not piece.color, to_sq)
-            if attackers:
-                penalty = piece_values[piece.piece_type] * 5  # stark bestrafen
-                if piece.color == chess.WHITE:
-                    score -= penalty
-                else:
-                    score += penalty
-        board.pop()
-
     return score
-
 
 # =====================
 # Minimax-Suche
@@ -140,6 +114,9 @@ def minimax(board, depth):
             best = min(best, val)
         return best
 
+# =====================
+# Züge auswählen
+# =====================
 def choose_move(board):
     global remaining_time_ms
 
@@ -149,38 +126,21 @@ def choose_move(board):
     if board.fullmove_number == 1:
         return random.choice(list(board.legal_moves))
 
-    # Dynamische Tiefe abhängig von Restzeit
-    if remaining_time_ms < 15000:
-        depth = 2
-    elif remaining_time_ms < 60000:
-        depth = random.choice([2,3])
-    elif remaining_time_ms < 180000:
-        depth = 3
-    elif remaining_time_ms < 600000:
-        depth = random.choice([3,4])
-    else:
-        depth = 4
+    depth = 3  # bewusst schwach
 
     best_score = -float('inf') if board.turn == chess.WHITE else float('inf')
     best_moves = []
 
     for move in board.legal_moves:
-        # König in Eröffnung nicht bewegen
-        piece = board.piece_at(move.from_square)
-        if board.fullmove_number < 10 and piece.piece_type == chess.KING:
-            continue
+        if stop_time and time.time() > stop_time:
+            break
 
         board.push(move)
         score = minimax(board, depth)
         board.pop()
 
-        # Prüfen, ob die gezogene Figur sofort angegriffen wird
-        piece_after = board.piece_at(move.to_square)
-        if piece_after and board.is_attacked_by(not piece_after.color, move.to_square):
-            score -= piece_values[piece_after.piece_type] * 5  # stark bestrafen
-
-        # Kleine menschliche Fehler
-        score += random.uniform(-0.05, 0.05)
+        # Menschliche Ungenauigkeit
+        score += random.uniform(-0.15, 0.15)
 
         if board.turn == chess.WHITE:
             if score > best_score:
@@ -195,11 +155,7 @@ def choose_move(board):
             elif score == best_score:
                 best_moves.append(move)
 
-    if not best_moves:
-        best_moves = [m for m in board.legal_moves]
-
-    return random.choice(best_moves)
-
+    return random.choice(best_moves) if best_moves else random.choice(list(board.legal_moves))
 
 # =====================
 # Hauptloop
