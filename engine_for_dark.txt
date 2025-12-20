@@ -99,7 +99,7 @@ def evaluate(board: chess.Board):
     if board.is_checkmate():
         return -INF + 1
 
-    if board.is_stalemate() or board.is_insufficient_material():
+    if board.is_stalemate() or board.is_insufficient_material() or board.can_claim_threefold_repetition():
         return 0
 
     material = 0
@@ -173,13 +173,8 @@ def evaluate(board: chess.Board):
         if board.piece_at(sq):
             score_white += DEV_PENALTY
 
-    # --- FIX: anti threefold repetition ---
-    if board.can_claim_threefold_repetition():
-        if abs(score_white) > 300:   
-            score_white -= 150       
     # --- side to move ---
     return score_white if board.turn == chess.WHITE else -score_white
-
 
 
 
