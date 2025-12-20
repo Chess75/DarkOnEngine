@@ -38,13 +38,13 @@ def calculate_think_time(remaining_time_ms):
     elif t >= 300:     # 5 Minuten
         return random.uniform(6, 12)
     elif t >= 180:     # 3 Minuten
-        return random.uniform(7, 12)
+        return random.uniform(3, 12)
     elif t >= 60:      # 1 Minute
-        return random.uniform(4, 6)
+        return random.uniform(1, 10)
     elif t >= 30:
-        return random.uniform(1, 2)
-    elif t >= 3:
-        return random.uniform(0.5, 1)
+        return random.uniform(0, 3)
+    elif t >= 5:
+        return random.uniform(0, 1)
     else:
         return 0.00    # Panic
 
