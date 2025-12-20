@@ -11,11 +11,11 @@ remaining_time_ms = 10000
 stop_time = None
 
 piece_values = {
-    chess.PAWN: 1,
-    chess.KNIGHT: 3,
-    chess.BISHOP: 3,
-    chess.ROOK: 5,
-    chess.QUEEN: 9,
+    chess.PAWN: 2,
+    chess.KNIGHT: 6,
+    chess.BISHOP: 6,
+    chess.ROOK: 10,
+    chess.QUEEN: 18,
     chess.KING: 0
 }
 
