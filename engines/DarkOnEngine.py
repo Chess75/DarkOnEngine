@@ -71,19 +71,19 @@ def evaluate_board(board):
             score += 0.2 if piece.color == chess.WHITE else -0.2
 
     # Anti-Dame (früh bewegen bestrafen)
-    if board.fullmove_number < 10:
-        score -= 0.3 * len(board.pieces(chess.QUEEN, chess.WHITE))
-        score += 0.3 * len(board.pieces(chess.QUEEN, chess.BLACK))
+    if board.fullmove_number < 15:
+        score -= 1.3 * len(board.pieces(chess.QUEEN, chess.WHITE))
+        score += 1.3 * len(board.pieces(chess.QUEEN, chess.BLACK))
 
     # Anti-König-Gezappel / Rochade (python-chess korrekt)
-    if board.fullmove_number < 15:
+    if board.fullmove_number < 30:
         white_king_square = board.king(chess.WHITE)
         black_king_square = board.king(chess.BLACK)
 
         if white_king_square not in (chess.G1, chess.C1):
-            score -= 0.2
+            score -= 3.0
         if black_king_square not in (chess.G8, chess.C8):
-            score += 0.2
+            score += 3.0
 
     return score
 
@@ -126,7 +126,7 @@ def choose_move(board):
     if board.fullmove_number == 1:
         return random.choice(list(board.legal_moves))
 
-    depth = 2  # bewusst schwach
+    depth = 4  # bewusst schwach
 
     best_score = -float('inf') if board.turn == chess.WHITE else float('inf')
     best_moves = []
