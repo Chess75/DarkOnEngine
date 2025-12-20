@@ -434,6 +434,7 @@ def uci_loop():
     board = chess.Board()
     search_thread = None
     stop_event = threading.Event()
+
     print("id name DarkOnEngine")
     print("id author Dark and Classic")
     print("uciok")
@@ -444,27 +445,36 @@ def uci_loop():
             line = sys.stdin.readline()
             if not line:
                 break
+
             line = line.strip()
-            if line == "":
+            if not line:
                 continue
+
             parts = line.split()
             cmd = parts[0]
 
+            # ---------------- UCI ----------------
             if cmd == "uci":
                 print("id name DarkOnEngine")
                 print("id author Dark and Classic")
                 print("uciok")
                 sys.stdout.flush()
+
             elif cmd == "isready":
                 print("readyok")
                 sys.stdout.flush()
+
             elif cmd == "ucinewgame":
                 board = chess.Board()
+
+            # ---------------- POSITION ----------------
             elif cmd == "position":
                 idx = 1
+
                 if len(parts) >= 2 and parts[1] == "startpos":
                     board = chess.Board()
                     idx = 2
+
                 elif len(parts) >= 2 and parts[1] == "fen":
                     if len(parts) >= 8:
                         fen = " ".join(parts[2:8])
@@ -473,81 +483,83 @@ def uci_loop():
                         except Exception:
                             board = chess.Board()
                         idx = 8
+
                 if idx < len(parts) and parts[idx] == "moves":
-                    for mv in parts[idx+1:]:
+                    for mv in parts[idx + 1:]:
                         try:
                             board.push_uci(mv)
                         except Exception:
                             pass
+
+            # ---------------- GO ----------------
             elif cmd == "go":
                 wtime = btime = winc = binc = movetime = None
                 depth = None
                 i = 1
+
                 while i < len(parts):
                     if parts[i] == "wtime":
-                        try:
-                            wtime = int(parts[i+1]); i += 2
-                        except Exception:
-                            i += 1
+                        wtime = int(parts[i + 1]); i += 2
                     elif parts[i] == "btime":
-                        try:
-                            btime = int(parts[i+1]); i += 2
-                        except Exception:
-                            i += 1
+                        btime = int(parts[i + 1]); i += 2
                     elif parts[i] == "winc":
-                        try:
-                            winc = int(parts[i+1]); i += 2
-                        except Exception:
-                            i += 1
+                        winc = int(parts[i + 1]); i += 2
                     elif parts[i] == "binc":
-                        try:
-                            binc = int(parts[i+1]); i += 2
-                        except Exception:
-                            i += 1
+                        binc = int(parts[i + 1]); i += 2
                     elif parts[i] == "movetime":
-                        try:
-                            movetime = int(parts[i+1]); i += 2
-                        except Exception:
-                            i += 1
+                        movetime = int(parts[i + 1]); i += 2
                     elif parts[i] == "depth":
-                        try:
-                            depth = int(parts[i+1]); i += 2
-                        except Exception:
-                            i += 1
+                        depth = int(parts[i + 1]); i += 2
                     else:
                         i += 1
 
-                # остановим предыдущий поиск, если есть
+                # остановить предыдущий поиск
                 if search_thread and search_thread.is_alive():
                     stop_event.set()
                     search_thread.join(timeout=1.0)
                     stop_event.clear()
 
+                # random first move
+                if board.fullmove_number == 1:
+                    legal_moves = list(board.legal_moves)
+                    if legal_moves:
+                        mv = random.choice(legal_moves)
+                        print(f"bestmove {mv.uci()}")
+                        sys.stdout.flush()
+                        continue
+
                 stop_event = threading.Event()
-                search_thread = SearchThread(board, wtime=wtime, btime=btime, winc=winc or 0, binc=binc or 0, movetime=movetime, max_depth=depth, stop_event=stop_event)
-                # запускаем асинхронно — поток сам выведет bestmove при завершении
+                search_thread = SearchThread(
+                    board,
+                    wtime=wtime,
+                    btime=btime,
+                    winc=winc or 0,
+                    binc=binc or 0,
+                    movetime=movetime,
+                    max_depth=depth,
+                    stop_event=stop_event
+                )
+
                 search_thread.start()
 
-                # НЕ блокируем основной loop — lichess/uci controller может отправить stop/quit
-
+            # ---------------- STOP ----------------
             elif cmd == "stop":
                 if search_thread and search_thread.is_alive():
                     stop_event.set()
                     search_thread.join(timeout=2.0)
-                # Ничего дополнительно не печатаем — поток печатает bestmove при завершении
 
+            # ---------------- QUIT ----------------
             elif cmd == "quit":
                 if search_thread and search_thread.is_alive():
                     stop_event.set()
                     search_thread.join(timeout=2.0)
                 break
-            else:
-                pass
 
         except Exception as e:
             print("error:", e, file=sys.stderr)
             sys.stderr.flush()
             break
+
 
 if __name__ == "__main__":
     uci_loop()
