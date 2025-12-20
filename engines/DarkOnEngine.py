@@ -9,6 +9,7 @@ import time
 # =====================
 remaining_time_ms = 10000
 stop_time = None
+strength_profile = "weak"  # Optionen: "weak", "normal"
 
 piece_values = {
     chess.PAWN: 1,
@@ -29,24 +30,16 @@ def calculate_think_time(remaining_time_ms):
 
     if t >= 1800:      # 30 Minuten
         return random.uniform(20, 30)
-    elif t >= 1200:    # 20 Minuten
-        return random.uniform(16, 25)
     elif t >= 600:     # 10 Minuten
         return random.uniform(12, 20)
-    elif t >= 420:     # 7 Minuten
-        return random.uniform(8, 15)
-    elif t >= 300:     # 5 Minuten
-        return random.uniform(6, 12)
     elif t >= 180:     # 3 Minuten
         return random.uniform(7, 12)
     elif t >= 60:      # 1 Minute
         return random.uniform(4, 6)
-    elif t >= 30:
-        return random.uniform(1, 2)
-    elif t >= 10:
-        return random.uniform(0.5, 1)
-    else:
-        return 0.05    # Panic
+    elif t >= 15:      # 15 Sekunden
+        return random.uniform(2, 4)
+    else:              # < 15 Sekunden
+        return 0.5
 
 # =====================
 # Bewertungsfunktion
@@ -126,7 +119,25 @@ def choose_move(board):
     if board.fullmove_number == 1:
         return random.choice(list(board.legal_moves))
 
-    depth = 2  # bewusst schwach
+    # ---------------------
+    # Dynamische Tiefe mit „Zwischenwerten“
+    # ---------------------
+    if remaining_time_ms < 15000:          # < 15 s
+        depth = 1
+    elif remaining_time_ms < 60000:        # < 1 min
+        depth = 1
+        if random.random() < 0.5:
+            depth = 2
+    elif remaining_time_ms < 180000:       # < 3 min
+        depth = 2
+    elif remaining_time_ms < 600000:       # < 10 min
+        depth = 2
+        if random.random() < 0.5:
+            depth = 3
+    elif remaining_time_ms < 1800000:      # < 30 min
+        depth = 3
+    else:                                  # 30+ min
+        depth = 3
 
     best_score = -float('inf') if board.turn == chess.WHITE else float('inf')
     best_moves = []
@@ -139,8 +150,11 @@ def choose_move(board):
         score = minimax(board, depth)
         board.pop()
 
-        # Menschliche Ungenauigkeit
-        score += random.uniform(-0.15, 0.15)
+        # Menschliche Ungenauigkeit basierend auf Strength-Profile
+        if strength_profile == "weak":
+            score += random.uniform(-0.15, 0.15)
+        else:  # normal schwach
+            score += random.uniform(-0.05, 0.05)
 
         if board.turn == chess.WHITE:
             if score > best_score:
@@ -161,7 +175,7 @@ def choose_move(board):
 # Hauptloop
 # =====================
 def main():
-    global remaining_time_ms, stop_time
+    global remaining_time_ms, stop_time, strength_profile
     board = chess.Board()
 
     while True:
@@ -224,6 +238,11 @@ def main():
                 time.sleep(target_think_time - elapsed)
 
             print("bestmove", move.uci() if move else "0000")
+
+        elif line.startswith("setoption name Strength value"):
+            val = line.split()[-1].lower()
+            if val in ("weak", "normal"):
+                strength_profile = val
 
         elif line == "quit":
             break
