@@ -27,7 +27,6 @@ center_squares = [chess.D4, chess.E4, chess.D5, chess.E5]
 # =====================
 def calculate_think_time(remaining_time_ms):
     t = remaining_time_ms / 1000  # Sekunden
-
     if t >= 1800:      # 30 Minuten
         return random.uniform(20, 60)
     elif t >= 600:     # 10 Minuten
@@ -40,18 +39,13 @@ def calculate_think_time(remaining_time_ms):
         return random.uniform(1, 4)
     elif t >= 3:       # 3 Sekunden
         return random.uniform(0.5, 2)
-    else:              # < 3 Sekunden
+    else:
         return 0.02
 
 # =====================
-# Bewertungsfunktion
+# Bewertungsfunktion inkl. Blunder-Vermeidung
 # =====================
 def evaluate_board(board):
-    if board.is_checkmate():
-        return 10000 if board.turn == chess.BLACK else -10000
-    if board.is_stalemate():
-        return 0
-
     score = 0
 
     # Material
@@ -65,12 +59,7 @@ def evaluate_board(board):
         if piece:
             score += 0.2 if piece.color == chess.WHITE else -0.2
 
-    # Anti-Dame (früh bewegen bestrafen)
-    if board.fullmove_number < 10:
-        score -= 0.3 * len(board.pieces(chess.QUEEN, chess.WHITE))
-        score += 0.3 * len(board.pieces(chess.QUEEN, chess.BLACK))
-
-    # König in Eröffnung stark bestrafen
+    # Anti-Dame / Anti-König
     if board.fullmove_number < 10:
         white_king_square = board.king(chess.WHITE)
         black_king_square = board.king(chess.BLACK)
@@ -78,6 +67,22 @@ def evaluate_board(board):
             score -= 5.0
         if black_king_square not in (chess.G8, chess.C8):
             score += 5.0
+        # Anti-Dame
+        score -= 0.3 * len(board.pieces(chess.QUEEN, chess.WHITE))
+        score += 0.3 * len(board.pieces(chess.QUEEN, chess.BLACK))
+
+    # ===========================
+    # Blunder-Vermeidung: Einzügige Figurenverluste
+    # ===========================
+    for square in chess.SQUARES:
+        piece = board.piece_at(square)
+        if piece and piece.color == board.turn:
+            attackers = board.attackers(not board.turn, square)
+            if attackers:
+                if strength_profile == "weak":
+                    score -= 0.5  # schwache Profile können ab und zu verlieren
+                else:
+                    score -= 2.0  # normal: stark bestraft
 
     return score
 
@@ -87,14 +92,12 @@ def evaluate_board(board):
 def minimax(board, depth):
     if stop_time and time.time() > stop_time:
         return evaluate_board(board)
-
     if depth == 0 or board.is_game_over():
         return evaluate_board(board)
 
     if board.turn == chess.WHITE:
         best = -float('inf')
         for move in board.legal_moves:
-            # Königzüge in den ersten 10 Zügen blockieren
             if board.fullmove_number < 10 and board.piece_at(move.from_square).piece_type == chess.KING:
                 continue
             board.push(move)
@@ -119,31 +122,23 @@ def minimax(board, depth):
 def choose_move(board):
     global remaining_time_ms
 
-    if remaining_time_ms < 1000:
+    if remaining_time_ms < 1000 or board.fullmove_number == 1:
         return random.choice(list(board.legal_moves))
 
-    if board.fullmove_number == 1:
-        return random.choice(list(board.legal_moves))
+    # Dynamische Tiefe basierend auf verbleibender Zeit
+if remaining_time_ms < 15000:          # < 15 s
+    depth = 2
+elif remaining_time_ms < 60000:        # < 1 min
+    depth = random.choice([2, 3])
+elif remaining_time_ms < 180000:       # < 3 min
+    depth = 3
+elif remaining_time_ms < 600000:       # < 10 min
+    depth = random.choice([3, 4])
+elif remaining_time_ms < 1800000:      # < 30 min
+    depth = 4
+else:                                  # 30+ min
+    depth = 4
 
-    # ---------------------
-    # Dynamische Tiefe mit Zwischenwerten
-    # ---------------------
-    if remaining_time_ms < 15000:          # < 15 s
-        depth = 2
-    elif remaining_time_ms < 60000:        # < 1 min
-        depth = 2
-        if random.random() < 0.5:
-            depth = 3
-    elif remaining_time_ms < 180000:       # < 3 min
-        depth = 3
-    elif remaining_time_ms < 600000:       # < 10 min
-        depth = 3
-        if random.random() < 0.5:
-            depth = 4
-    elif remaining_time_ms < 1800000:      # < 30 min
-        depth = 4
-    else:                                  # 30+ min
-        depth = 3
 
     best_score = -float('inf') if board.turn == chess.WHITE else float('inf')
     best_moves = []
@@ -152,7 +147,6 @@ def choose_move(board):
         if stop_time and time.time() > stop_time:
             break
 
-        # Königzüge in Eröffnung überspringen
         if board.fullmove_number < 10 and board.piece_at(move.from_square).piece_type == chess.KING:
             continue
 
@@ -160,10 +154,10 @@ def choose_move(board):
         score = minimax(board, depth)
         board.pop()
 
-        # Menschliche Ungenauigkeit basierend auf Strength-Profile
+        # Zufall, schwach vs normal
         if strength_profile == "weak":
             score += random.uniform(-0.1, 0.1)
-        else:  # normal schwach
+        else:
             score += random.uniform(-0.05, 0.05)
 
         if board.turn == chess.WHITE:
@@ -179,11 +173,10 @@ def choose_move(board):
             elif score == best_score:
                 best_moves.append(move)
 
-    # Wenn keine zulässigen Züge nach King-Schutz, dann legalen nehmen
     if not best_moves:
         best_moves = [move for move in board.legal_moves]
 
-    return random.choice(best_moves) if best_moves else random.choice(list(board.legal_moves))
+    return random.choice(best_moves)
 
 # =====================
 # Hauptloop
@@ -239,14 +232,10 @@ def main():
                 remaining_time_ms = btime
 
             target_think_time = calculate_think_time(remaining_time_ms)
-
-            # Rechenabbruch für Minimax
             stop_time = time.time() + min(target_think_time * 0.7, 3.0)
 
             start = time.time()
             move = choose_move(board)
-
-            # Warten bis Zielzeit erreicht
             elapsed = time.time() - start
             if elapsed < target_think_time:
                 time.sleep(target_think_time - elapsed)
