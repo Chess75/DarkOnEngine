@@ -140,9 +140,6 @@ def minimax(board, depth):
             best = min(best, val)
         return best
 
-# =====================
-# Züge auswählen
-# =====================
 def choose_move(board):
     global remaining_time_ms
 
@@ -152,21 +149,38 @@ def choose_move(board):
     if board.fullmove_number == 1:
         return random.choice(list(board.legal_moves))
 
-    depth = 2  # bewusst schwach
+    # Dynamische Tiefe abhängig von Restzeit
+    if remaining_time_ms < 15000:
+        depth = 2
+    elif remaining_time_ms < 60000:
+        depth = random.choice([2,3])
+    elif remaining_time_ms < 180000:
+        depth = 3
+    elif remaining_time_ms < 600000:
+        depth = random.choice([3,4])
+    else:
+        depth = 4
 
     best_score = -float('inf') if board.turn == chess.WHITE else float('inf')
     best_moves = []
 
     for move in board.legal_moves:
-        if stop_time and time.time() > stop_time:
-            break
+        # König in Eröffnung nicht bewegen
+        piece = board.piece_at(move.from_square)
+        if board.fullmove_number < 10 and piece.piece_type == chess.KING:
+            continue
 
         board.push(move)
         score = minimax(board, depth)
         board.pop()
 
-        # Menschliche Ungenauigkeit
-        score += random.uniform(-0.15, 0.15)
+        # Prüfen, ob die gezogene Figur sofort angegriffen wird
+        piece_after = board.piece_at(move.to_square)
+        if piece_after and board.is_attacked_by(not piece_after.color, move.to_square):
+            score -= piece_values[piece_after.piece_type] * 5  # stark bestrafen
+
+        # Kleine menschliche Fehler
+        score += random.uniform(-0.05, 0.05)
 
         if board.turn == chess.WHITE:
             if score > best_score:
@@ -181,7 +195,11 @@ def choose_move(board):
             elif score == best_score:
                 best_moves.append(move)
 
-    return random.choice(best_moves) if best_moves else random.choice(list(board.legal_moves))
+    if not best_moves:
+        best_moves = [m for m in board.legal_moves]
+
+    return random.choice(best_moves)
+
 
 # =====================
 # Hauptloop
