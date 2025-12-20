@@ -95,6 +95,7 @@ def mvv_lva_score(board, move):
 
 def evaluate(board: chess.Board):
 
+    # --- terminal ---
     if board.is_checkmate():
         return -INF + 1
     if board.is_stalemate() or board.is_insufficient_material():
@@ -117,35 +118,51 @@ def evaluate(board: chess.Board):
 
     score_white = material + pst_score
 
-    # --- Mobility ---
-    mobility = 5 * sum(1 for _ in board.legal_moves)
+    # --- Mobility (ослабленная!) ---
+    mobility = 2 * sum(1 for _ in board.legal_moves)
     score_white += mobility
 
     # --- Check penalty ---
     if board.is_check():
         score_white -= 50
 
-    # FIX KING
-    CASTLE_BONUS = 35
-    EARLY_KING_PENALTY = 60
-
     wk = board.king(chess.WHITE)
     bk = board.king(chess.BLACK)
 
-    # White
-    if wk == chess.G1 or wk == chess.C1:
+    # --- Early king move penalty ---
+    if board.fullmove_number <= 10:
+        if wk != chess.E1:
+            score_white -= 80
+        if bk != chess.E8:
+            score_white += 80
+
+    # --- King in center later ---
+    if board.fullmove_number > 10:
+        if wk in (chess.E1, chess.D1, chess.E2, chess.D2):
+            score_white -= 30
+        if bk in (chess.E8, chess.D8, chess.E7, chess.D7):
+            score_white += 30
+
+    # --- Castling bonus ---
+    CASTLE_BONUS = 50
+
+    if wk in (chess.G1, chess.C1):
         score_white += CASTLE_BONUS
-    elif wk != chess.E1 and board.fullmove_number < 10:
-        score_white -= EARLY_KING_PENALTY
-
-    # Black
-    if bk == chess.G8 or bk == chess.C8:
+    if bk in (chess.G8, chess.C8):
         score_white -= CASTLE_BONUS
-    elif bk != chess.E8 and board.fullmove_number < 10:
-        score_white += EARLY_KING_PENALTY
 
-    # --- Development ---
-    DEV_PENALTY = 10
+
+    HANGING_QUEEN_PENALTY = 900
+
+    for sq in board.pieces(chess.QUEEN, chess.WHITE):
+        if board.is_attacked_by(chess.BLACK, sq):
+            score_white -= HANGING_QUEEN_PENALTY
+
+    for sq in board.pieces(chess.QUEEN, chess.BLACK):
+        if board.is_attacked_by(chess.WHITE, sq):
+            score_white += HANGING_QUEEN_PENALTY
+
+    DEV_PENALTY = 8
 
     for sq in (chess.B1, chess.G1, chess.C1, chess.F1):
         if board.piece_at(sq):
@@ -155,15 +172,9 @@ def evaluate(board: chess.Board):
         if board.piece_at(sq):
             score_white += DEV_PENALTY
 
-    # --- King in center AFTER opening ---
-    if board.fullmove_number > 10:
-        if wk in (chess.E1, chess.D1, chess.E2, chess.D2):
-            score_white -= 30
-        if bk in (chess.E8, chess.D8, chess.E7, chess.D7):
-            score_white += 30
-
-    # --- Return from side to move ---
+    # --- side to move ---
     return score_white if board.turn == chess.WHITE else -score_white
+
 
 # ---- TT and state ----
 class SearchState:
