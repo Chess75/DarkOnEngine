@@ -9,7 +9,7 @@ import time
 # =====================
 remaining_time_ms = 10000
 stop_time = None
-strength_profile = "weak"  # Optionen: "weak", "normal"
+strength_profile = "normal"  # Optionen: "weak", "normal"
 
 piece_values = {
     chess.PAWN: 1,
