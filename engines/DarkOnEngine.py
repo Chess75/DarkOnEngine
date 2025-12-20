@@ -11,34 +11,42 @@ remaining_time_ms = 10000
 stop_time = None
 
 piece_values = {
-    chess.PAWN: 2,
-    chess.KNIGHT: 6,
-    chess.BISHOP: 6,
-    chess.ROOK: 10,
-    chess.QUEEN: 18,
+    chess.PAWN: 1,
+    chess.KNIGHT: 3,
+    chess.BISHOP: 3,
+    chess.ROOK: 5,
+    chess.QUEEN: 9,
     chess.KING: 0
 }
 
 center_squares = [chess.D4, chess.E4, chess.D5, chess.E5]
 
 # =====================
-# Zeit → Denkzeit Mapping
+# Zeit → Denkzeit Mapping (angepasst, langsamer)
 # =====================
 def calculate_think_time(remaining_time_ms):
-    t = remaining_time_ms / 1000
+    t = remaining_time_ms / 1000  # Sekunden
 
-    if t >= 1800:
+    if t >= 1800:      # 30 Minuten
         return random.uniform(20, 30)
-    elif t >= 600:
+    elif t >= 1200:    # 20 Minuten
+        return random.uniform(16, 25)
+    elif t >= 600:     # 10 Minuten
         return random.uniform(12, 20)
-    elif t >= 180:
-        return random.uniform(3, 12)
-    elif t >= 60:
-        return random.uniform(1, 6)
-    elif t >= 10:
+    elif t >= 420:     # 7 Minuten
+        return random.uniform(8, 15)
+    elif t >= 300:     # 5 Minuten
+        return random.uniform(6, 12)
+    elif t >= 180:     # 3 Minuten
+        return random.uniform(7, 12)
+    elif t >= 60:      # 1 Minute
+        return random.uniform(4, 6)
+    elif t >= 30:
+        return random.uniform(1, 2)
+    elif t >= 3:
         return random.uniform(0.5, 1)
     else:
-        return 0.0
+        return 0.00    # Panic
 
 # =====================
 # Bewertungsfunktion
@@ -52,32 +60,35 @@ def evaluate_board(board):
     score = 0
 
     # Material
-    for pt in piece_values:
-        score += len(board.pieces(pt, chess.WHITE)) * piece_values[pt]
-        score -= len(board.pieces(pt, chess.BLACK)) * piece_values[pt]
+    for piece_type in piece_values:
+        score += len(board.pieces(piece_type, chess.WHITE)) * piece_values[piece_type]
+        score -= len(board.pieces(piece_type, chess.BLACK)) * piece_values[piece_type]
 
     # Zentrum
-    for sq in center_squares:
-        p = board.piece_at(sq)
-        if p:
-            score += 0.3 if p.color == chess.WHITE else -0.3
+    for square in center_squares:
+        piece = board.piece_at(square)
+        if piece:
+            score += 0.2 if piece.color == chess.WHITE else -0.2
 
-    # Anti-Dame früh
+    # Anti-Dame (früh bewegen bestrafen)
+    if board.fullmove_number < 10:
+        score -= 0.3 * len(board.pieces(chess.QUEEN, chess.WHITE))
+        score += 0.3 * len(board.pieces(chess.QUEEN, chess.BLACK))
+
+    # Anti-König-Gezappel / Rochade (python-chess korrekt)
     if board.fullmove_number < 15:
-        score -= 1.3 * len(board.pieces(chess.QUEEN, chess.WHITE))
-        score += 1.3 * len(board.pieces(chess.QUEEN, chess.BLACK))
+        white_king_square = board.king(chess.WHITE)
+        black_king_square = board.king(chess.BLACK)
 
-    # Königssicherheit
-    if board.fullmove_number < 30:
-        if board.king(chess.WHITE) not in (chess.G1, chess.C1):
-            score -= 6.0
-        if board.king(chess.BLACK) not in (chess.G8, chess.C8):
-            score += 6.0
+        if white_king_square not in (chess.G1, chess.C1):
+            score -= 0.2
+        if black_king_square not in (chess.G8, chess.C8):
+            score += 0.2
 
     return score
 
 # =====================
-# Minimax (unverändert)
+# Minimax-Suche
 # =====================
 def minimax(board, depth):
     if stop_time and time.time() > stop_time:
@@ -88,21 +99,23 @@ def minimax(board, depth):
 
     if board.turn == chess.WHITE:
         best = -float('inf')
-        for m in board.legal_moves:
-            board.push(m)
-            best = max(best, minimax(board, depth - 1))
+        for move in board.legal_moves:
+            board.push(move)
+            val = minimax(board, depth - 1)
             board.pop()
+            best = max(best, val)
         return best
     else:
         best = float('inf')
-        for m in board.legal_moves:
-            board.push(m)
-            best = min(best, minimax(board, depth - 1))
+        for move in board.legal_moves:
+            board.push(move)
+            val = minimax(board, depth - 1)
             board.pop()
+            best = min(best, val)
         return best
 
 # =====================
-# Zugauswahl (HIER IST DER FIX)
+# Züge auswählen
 # =====================
 def choose_move(board):
     global remaining_time_ms
@@ -113,7 +126,7 @@ def choose_move(board):
     if board.fullmove_number == 1:
         return random.choice(list(board.legal_moves))
 
-    depth = 3  # stabiler als 4
+    depth = 2  # bewusst schwach
 
     best_score = -float('inf') if board.turn == chess.WHITE else float('inf')
     best_moves = []
@@ -124,19 +137,10 @@ def choose_move(board):
 
         board.push(move)
         score = minimax(board, depth)
-
-        # =====================
-        # HÄNGENDE-FIGUR-STRAFE
-        # =====================
-        moved_piece = board.piece_at(move.to_square)
-        if moved_piece:
-            if board.is_attacked_by(not board.turn, move.to_square):
-                score -= piece_values[moved_piece.piece_type] * 3
-
         board.pop()
 
-        # Sehr kleiner Zufall (menschlich, aber kein Müll)
-        score += random.uniform(-0.05, 0.05)
+        # Menschliche Ungenauigkeit
+        score += random.uniform(-0.5, 0.5) 
 
         if board.turn == chess.WHITE:
             if score > best_score:
@@ -154,7 +158,7 @@ def choose_move(board):
     return random.choice(best_moves) if best_moves else random.choice(list(board.legal_moves))
 
 # =====================
-# UCI Loop
+# Hauptloop
 # =====================
 def main():
     global remaining_time_ms, stop_time
@@ -174,7 +178,7 @@ def main():
         elif line == "isready":
             print("readyok")
 
-        elif line == "ucinewgame":
+        elif line.startswith("ucinewgame"):
             board.reset()
 
         elif line.startswith("position"):
@@ -182,32 +186,44 @@ def main():
             if "startpos" in parts:
                 board.reset()
                 if "moves" in parts:
-                    for mv in parts[parts.index("moves")+1:]:
+                    for mv in parts[parts.index("moves") + 1:]:
                         board.push_uci(mv)
             elif "fen" in parts:
-                idx = parts.index("fen")
-                board.set_fen(" ".join(parts[idx+1:idx+7]))
+                fen_index = parts.index("fen")
+                fen = " ".join(parts[fen_index + 1:fen_index + 7])
+                board.set_fen(fen)
                 if "moves" in parts:
-                    for mv in parts[parts.index("moves")+1:]:
+                    for mv in parts[parts.index("moves") + 1:]:
                         board.push_uci(mv)
 
         elif line.startswith("go"):
             parts = line.split()
-            if "wtime" in parts and board.turn == chess.WHITE:
-                remaining_time_ms = int(parts[parts.index("wtime")+1])
-            if "btime" in parts and board.turn == chess.BLACK:
-                remaining_time_ms = int(parts[parts.index("btime")+1])
+            wtime = btime = None
 
-            think = calculate_think_time(remaining_time_ms)
-            stop_time = time.time() + min(think * 0.7, 3.0)
+            if "wtime" in parts:
+                wtime = int(parts[parts.index("wtime") + 1])
+            if "btime" in parts:
+                btime = int(parts[parts.index("btime") + 1])
+
+            if board.turn == chess.WHITE and wtime is not None:
+                remaining_time_ms = wtime
+            elif board.turn == chess.BLACK and btime is not None:
+                remaining_time_ms = btime
+
+            target_think_time = calculate_think_time(remaining_time_ms)
+
+            # Rechenabbruch für Minimax
+            stop_time = time.time() + min(target_think_time * 0.7, 3.0)
 
             start = time.time()
             move = choose_move(board)
-            elapsed = time.time() - start
-            if elapsed < think:
-                time.sleep(think - elapsed)
 
-            print("bestmove", move.uci())
+            # Warten bis Zielzeit erreicht
+            elapsed = time.time() - start
+            if elapsed < target_think_time:
+                time.sleep(target_think_time - elapsed)
+
+            print("bestmove", move.uci() if move else "0000")
 
         elif line == "quit":
             break
