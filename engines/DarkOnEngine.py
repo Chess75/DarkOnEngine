@@ -140,7 +140,7 @@ def choose_move(board):
         board.pop()
 
         # Menschliche Ungenauigkeit
-        score += random.uniform(-0.15, 0.15)
+        score += random.uniform(-0.5, 0.5) 
 
         if board.turn == chess.WHITE:
             if score > best_score:
