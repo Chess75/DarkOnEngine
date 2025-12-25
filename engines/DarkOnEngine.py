@@ -99,6 +99,40 @@ def evaluate(board: chess.Board):
 
     check_bonus = -50 if board.is_check() else 0
 
+    # ========= BISHOP =========
+    for sq in board.pieces(chess.BISHOP, chess.WHITE):
+        blocked = 0
+        for pawn_sq in board.pieces(chess.PAWN, chess.WHITE):
+            if chess.square_color(sq) == chess.square_color(pawn_sq):
+                blocked += 1
+        score -= blocked * 4
+
+    for sq in board.pieces(chess.BISHOP, chess.BLACK):
+        blocked = 0
+        for pawn_sq in board.pieces(chess.PAWN, chess.BLACK):
+            if chess.square_color(sq) == chess.square_color(pawn_sq):
+                blocked += 1
+        score += blocked * 4
+
+
+    DEV_SQUARES_WHITE = {chess.C4, chess.B5, chess.E3, chess.F4, chess.G5}
+    DEV_SQUARES_BLACK = {chess.C5, chess.B4, chess.E6, chess.F5, chess.G4}
+
+    for sq in board.pieces(chess.BISHOP, chess.WHITE):
+        if sq in DEV_SQUARES_WHITE:
+            score += 15
+
+    for sq in board.pieces(chess.BISHOP, chess.BLACK):
+        if sq in DEV_SQUARES_BLACK:
+            score -= 15
+
+    if board.fullmove_number < 8:
+        for sq in board.pieces(chess.QUEEN, chess.WHITE):
+            score -= 20
+        for sq in board.pieces(chess.QUEEN, chess.BLACK):
+            score += 20
+
+
     score_white = material + pst_score + mobility + check_bonus
     return score_white if board.turn == chess.WHITE else -score_white
 
